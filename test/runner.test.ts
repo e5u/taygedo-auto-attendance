@@ -214,7 +214,7 @@ describe('runAttendance', () => {
     expect(secretWriter).toHaveBeenCalledWith(JSON.stringify(result.updatedAccounts, null, 2))
   })
 
-  it('uses stored phone and password before refresh when the stored accessToken is rejected', async () => {
+  it('uses an environment password before refresh when the stored accessToken is rejected', async () => {
     const secretWriter = vi.fn()
     const api = {
       loginWithPassword: vi.fn().mockResolvedValue({ token: 'new-laohu-token', userId: 'new-laohu-user' }),
@@ -241,10 +241,12 @@ describe('runAttendance', () => {
           accessToken: 'stored-access',
           refreshToken: 'old-main',
           phone: '13800138000',
-          password: 'secret-password',
         },
       ]),
       api,
+      accountPasswords: {
+        main: 'secret-password',
+      },
       maxRetries: 1,
       secretWriter,
     })
@@ -258,7 +260,6 @@ describe('runAttendance', () => {
       laohuToken: 'new-laohu-token',
       laohuUserId: 'new-laohu-user',
       phone: '13800138000',
-      password: 'secret-password',
       tokenUpdatedAt: expect.any(String),
     }))
     expect(secretWriter).toHaveBeenCalledWith(JSON.stringify(result.updatedAccounts, null, 2))
@@ -290,10 +291,12 @@ describe('runAttendance', () => {
           accessToken: 'stored-access',
           refreshToken: 'old-main',
           phone: '13800138000',
-          password: 'secret-password',
         },
       ]),
       api,
+      accountPasswords: {
+        main: 'secret-password',
+      },
       maxRetries: 1,
     })
 
@@ -303,7 +306,6 @@ describe('runAttendance', () => {
       accessToken: 'new-access',
       refreshToken: 'new-refresh',
       phone: '13800138000',
-      password: 'secret-password',
     }))
   })
 

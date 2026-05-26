@@ -120,6 +120,7 @@ account_name=小号
 | `GH_SECRET_UPDATE_TOKEN` | 必填，用于写回 `TAYGEDO_ACCOUNTS` |
 | `TAYGEDO_ACCOUNTS` | 登录 workflow 自动生成，通常不用手写 |
 | `TAYGEDO_LOGIN_PASSWORD` | 密码登录推荐使用的密码 Secret |
+| `TAYGEDO_PASSWORDS` | 多账号自动重登用密码映射，例如 `{"main":"密码"}` |
 | `TAYGEDO_LOGIN_DEVICE_ID` | 短信登录自动生成 |
 | `TAYGEDO_NOTIFICATION_URLS` | 普通 webhook，多个用英文逗号分隔 |
 | `TAYGEDO_SERVERCHAN_SENDKEY` | Server 酱 SendKey |
@@ -141,14 +142,18 @@ account_name=小号
     "laohuToken": "your-laohu-token",
     "laohuUserId": "your-laohu-user-id",
     "tokenUpdatedAt": "2026-05-07T00:00:00.000Z",
-    "phone": "13800138000",
-    "password": "your-password",
-    "passwordUpdatedAt": "2026-05-08T00:00:00.000Z"
+    "phone": "13800138000"
   }
 ]
 ```
 
-`phone` / `password` 存在时，`accessToken` 失效后会优先自动账密重登；失败后再尝试 `refreshToken` 和老虎登录凭证。
+账号 JSON 不保存明文密码。需要自动账密重登时，把密码放在运行环境里：
+
+```text
+TAYGEDO_PASSWORDS={"main":"你的塔吉多密码"}
+```
+
+`accessToken` 失效且账号有 `phone`，并且运行环境能按 `account_id` 或手机号找到密码时，会优先账密重登；失败后再尝试 `refreshToken` 和老虎登录凭证。
 
 ## Cloudflare Workers
 
@@ -170,6 +175,16 @@ TAYGEDO_SERVERCHAN_SENDKEY=Server 酱 SendKey
 
 Worker 使用绑定名为 `KV` 的 Cloudflare KV。首次运行会从 `TAYGEDO_ACCOUNTS` 初始化 KV，之后账号更新写回 KV。
 
+通过密码登录并写入 KV：
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer <TAYGEDO_ADMIN_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"mode":"password","phone":"13800138000","password":"你的塔吉多密码","accountId":"main","accountName":"主账号"}' \
+  https://你的-worker.workers.dev/login
+```
+
 手动触发：
 
 ```bash
@@ -178,11 +193,18 @@ curl -H "Authorization: Bearer <TAYGEDO_ADMIN_TOKEN>" https://你的-worker.work
 
 ## Docker
 
-准备账号文件：
+生成账号文件：
 
 ```bash
 mkdir -p data
-cp updated-accounts.json data/accounts.json
+docker compose run --rm taygedo-attendance \
+  -e TAYGEDO_LOGIN_PASSWORD=your-password \
+  pnpm local login \
+  --mode password \
+  --phone 13800138000 \
+  --account-id main \
+  --account-name 主账号 \
+  --accounts-file /data/accounts.json
 ```
 
 使用 compose 运行一次签到：
@@ -210,12 +232,12 @@ pnpm local attendance --accounts-file data/accounts.json --state-dir data/state
 本地账密登录：
 
 ```bash
-pnpm local login --mode password --phone 13800138000 --password your-password --account-id main --account-name 主账号 --accounts-file data/accounts.json
+TAYGEDO_LOGIN_PASSWORD=your-password pnpm local login --mode password --phone 13800138000 --account-id main --account-name 主账号 --accounts-file data/accounts.json
 ```
 
 ## 安全提示
 
-本项目不会加密账号 JSON 里的 `password` 字段。GitHub 用户请优先把密码放到 `TAYGEDO_LOGIN_PASSWORD` Secret，不要写进 README、issue、日志或公开文件。
+本项目不会把登录密码写入 `accounts.json`、Cloudflare KV 或 GitHub Secret 里的账号 JSON。需要自动重登时，请把密码放在 GitHub Secret、Cloudflare Secret、Docker `.env` 或本地环境变量里，不要写进 README、issue、日志或公开文件。
 
 ## 致谢
 

@@ -20,6 +20,22 @@ describe('loadRuntimeConfig', () => {
       stateStore: 'memory',
       accountsKey: 'TAYGEDO_ACCOUNTS',
       statePrefix: 'taygedo',
+      accountPasswords: {},
+    }))
+  })
+
+  it('loads account passwords from a json map and default password env', () => {
+    expect(loadRuntimeConfig({
+      TAYGEDO_PASSWORDS: '{"main":"main-password","13800138000":"phone-password"}',
+      TAYGEDO_LOGIN_PASSWORD: 'default-password',
+      TAYGEDO_LOGIN_ACCOUNT_ID: 'alt',
+    })).toEqual(expect.objectContaining({
+      accountPasswords: {
+        main: 'main-password',
+        '13800138000': 'phone-password',
+        default: 'default-password',
+        alt: 'default-password',
+      },
     }))
   })
 

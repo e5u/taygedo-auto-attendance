@@ -28,6 +28,38 @@ describe('cloudflare worker runtime', () => {
     expect(denied.status).toBe(401)
     expect(allowed.status).toBe(200)
   })
+
+  it('logs in with a password through a protected endpoint and stores accounts without plaintext password', async () => {
+    const kv = new Map<string, string>()
+    const env = createEnv(kv, { TAYGEDO_ADMIN_TOKEN: 'secret' })
+
+    const denied = await worker.fetch(new Request('https://example.com/login', {
+      method: 'POST',
+      body: JSON.stringify({
+        mode: 'password',
+        phone: '13800138000',
+        password: 'secret-password',
+        accountId: 'main',
+        accountName: '主账号',
+      }),
+    }), env, {} as ExecutionContext)
+    const allowed = await worker.fetch(new Request('https://example.com/login', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer secret' },
+      body: JSON.stringify({
+        mode: 'password',
+        phone: '13800138000',
+        password: 'secret-password',
+        accountId: 'main',
+        accountName: '主账号',
+      }),
+    }), env, {} as ExecutionContext)
+
+    expect(denied.status).toBe(401)
+    expect(allowed.status).toBe(200)
+    expect(kv.get('TAYGEDO_ACCOUNTS')).toBeDefined()
+    expect(kv.get('TAYGEDO_ACCOUNTS')).not.toContain('secret-password')
+  })
 })
 
 function createEnv(kv: Map<string, string>, overrides: Partial<Record<string, string>> = {}) {
@@ -40,6 +72,12 @@ function createEnv(kv: Map<string, string>, overrides: Partial<Record<string, st
     getSigninState: vi.fn().mockResolvedValue({ days: 1 }),
     getSigninRewards: vi.fn().mockResolvedValue([{ name: '奖励一', num: 1 }]),
     gameSignin: vi.fn().mockResolvedValue(undefined),
+    sendCaptcha: vi.fn().mockResolvedValue(undefined),
+    checkCaptcha: vi.fn().mockResolvedValue(undefined),
+    loginWithCaptcha: vi.fn().mockResolvedValue({ token: 'laohu-token', userId: 'laohu-user' }),
+    loginWithPassword: vi.fn().mockResolvedValue({ token: 'laohu-token', userId: 'laohu-user' }),
+    userCenterLogin: vi.fn().mockResolvedValue({ accessToken: 'access', refreshToken: 'refresh-new', uid: '1' }),
+    getBindRole: vi.fn().mockResolvedValue({ roleId: 'role-1', roleName: '角色一' }),
   }
   return {
     KV: {
@@ -47,6 +85,7 @@ function createEnv(kv: Map<string, string>, overrides: Partial<Record<string, st
       put: vi.fn(async (key: string, value: string) => { kv.set(key, value) }),
     },
     TAYGEDO_TEST_API: api,
+    TAYGEDO_TEST_LOGIN_API: api,
     TAYGEDO_ACCOUNTS: JSON.stringify([
       { id: 'main', name: '主账号', uid: '1', deviceId: 'device-1', refreshToken: 'refresh' },
     ]),

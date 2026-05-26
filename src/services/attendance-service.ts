@@ -7,6 +7,7 @@ export interface AttendanceServiceOptions {
   accountStore: AccountStore
   stateStore?: StateStore
   api?: RunnerDependencies['api']
+  accountPasswords?: Record<string, string>
   notificationUrls?: string[]
   maxRetries?: number
 }
@@ -19,6 +20,7 @@ export class AttendanceService {
     const result = await runAttendance({
       accountsSecret,
       api: this.options.api ?? new TaygedoApi(),
+      accountPasswords: this.options.accountPasswords,
       notificationUrls: this.options.notificationUrls,
       maxRetries: this.options.maxRetries,
       secretWriter: payload => this.options.accountStore.writeAccounts(payload),

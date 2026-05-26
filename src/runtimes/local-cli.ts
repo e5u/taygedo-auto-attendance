@@ -32,7 +32,7 @@ export async function runLocalCli(argv = process.argv.slice(2), deps: LocalCliDe
     await service.runLogin({
       mode: requireOption(options, 'mode'),
       phone: requireOption(options, 'phone'),
-      password: options.password,
+      password: options.password ?? process.env.TAYGEDO_LOGIN_PASSWORD ?? process.env.TAYGEDO_PASSWORD,
       captcha: options.captcha,
       deviceId: options['device-id'],
       accountId: options['account-id'],
@@ -56,6 +56,7 @@ function createDefaultService(): LocalCliService {
       await new AttendanceService({
         accountStore: createAccountStore({ config, accountsFile: options.accountsFile }),
         stateStore: createStateStore({ config, stateDir: options.stateDir }),
+        accountPasswords: config.accountPasswords,
         notificationUrls: config.notificationUrls,
         maxRetries: config.maxRetries,
       }).run()

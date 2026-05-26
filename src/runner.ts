@@ -7,6 +7,7 @@ import { TAYGEDO_GAME_IDS } from './taygedo/games.js'
 export interface RunnerDependencies {
   accountsSecret: string
   api?: AttendanceApi
+  accountPasswords?: Record<string, string>
   notificationUrls?: string[]
   maxRetries?: number
   secretWriter?: (payload: string) => Promise<void>
@@ -52,7 +53,7 @@ export async function runAttendance(deps: RunnerDependencies): Promise<RunAttend
   for (const account of accounts) {
     try {
       const accountRun = await withRetries(async () => {
-        return await runAccount(api, account)
+        return await runAccount(api, account, deps.accountPasswords ?? {})
       }, deps.maxRetries ?? 3)
 
       if (accountRun.shouldUpdateSecret) {
@@ -104,6 +105,7 @@ interface AccountRunResult {
 async function runAccount(
   api: AttendanceApi,
   account: TaygedoAccount,
+  accountPasswords: Record<string, string>,
 ): Promise<AccountRunResult> {
   if (account.accessToken) {
     try {
@@ -116,17 +118,19 @@ async function runAccount(
     }
   }
 
-  const session = await refreshOrRebuildSession(api, account)
+  const session = await refreshOrRebuildSession(api, account, accountPasswords)
   return await signWithSession(api, session.account, session.accessToken, true)
 }
 
 async function refreshOrRebuildSession(
   api: Pick<TaygedoApi, 'refreshToken'> & Partial<Pick<TaygedoApi, 'loginWithPassword' | 'userCenterLogin'>>,
   account: TaygedoAccount,
+  accountPasswords: Record<string, string>,
 ): Promise<{ account: TaygedoAccount, accessToken: string }> {
-  if (account.phone && account.password && api.loginWithPassword && api.userCenterLogin) {
+  const password = accountPasswords[account.id] ?? accountPasswords[account.phone ?? ''] ?? accountPasswords.default
+  if (account.phone && password && api.loginWithPassword && api.userCenterLogin) {
     try {
-      const login = await api.loginWithPassword(account.phone, account.password, account.deviceId)
+      const login = await api.loginWithPassword(account.phone, password, account.deviceId)
       const rebuilt = await api.userCenterLogin(login.token, login.userId, account.deviceId)
       const updatedAccount = withSession(account, {
         accessToken: rebuilt.accessToken,

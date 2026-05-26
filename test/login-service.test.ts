@@ -30,10 +30,12 @@ describe('LoginService', () => {
         accountsFile,
       })
 
-      expect(JSON.parse(await readFile(accountsFile, 'utf8'))).toEqual([
+      const accounts = JSON.parse(await readFile(accountsFile, 'utf8'))
+      expect(accounts).toEqual([
         { id: 'alt', name: '小号', uid: '2', deviceId: 'old-device', refreshToken: 'old-refresh' },
-        expect.objectContaining({ id: 'main', phone: '13800138000', password: 'secret-password' }),
+        expect.objectContaining({ id: 'main', phone: '13800138000' }),
       ])
+      expect(JSON.stringify(accounts)).not.toContain('secret-password')
     }
     finally {
       await rm(dir, { recursive: true, force: true })

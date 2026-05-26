@@ -32,6 +32,8 @@ jobs:
           TAYGEDO_NOTIFICATION_URLS: ${{ secrets.TAYGEDO_NOTIFICATION_URLS }}
           TAYGEDO_SERVERCHAN_SENDKEY: ${{ secrets.TAYGEDO_SERVERCHAN_SENDKEY }}
           TAYGEDO_MAX_RETRIES: ${{ secrets.TAYGEDO_MAX_RETRIES }}
+          TAYGEDO_PASSWORDS: ${{ secrets.TAYGEDO_PASSWORDS }}
+          TAYGEDO_LOGIN_PASSWORD: ${{ secrets.TAYGEDO_LOGIN_PASSWORD }}
           TAYGEDO_UPDATED_ACCOUNTS_PATH: updated-accounts.json
         run: pnpm action
 

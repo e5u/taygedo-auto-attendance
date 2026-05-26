@@ -106,7 +106,7 @@ describe('runLoginAction', () => {
     }
   })
 
-  it('logs in with a password and stores credentials for automatic relogin', async () => {
+  it('logs in with a password without storing the plaintext password', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'taygedo-login-password-'))
     const accountsPath = join(dir, 'updated-accounts.json')
     const api = {
@@ -152,8 +152,6 @@ describe('runLoginAction', () => {
           laohuUserId: 'laohu-user',
           tokenUpdatedAt: expect.any(String),
           phone: '13800138000',
-          password: 'secret-password',
-          passwordUpdatedAt: expect.any(String),
         },
       ])
     }

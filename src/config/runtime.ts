@@ -3,6 +3,7 @@ export type StateStoreKind = 'memory' | 'file' | 'cloudflare-kv' | 'upstash'
 
 export interface RuntimeConfig {
   accountsSecret?: string
+  accountPasswords: Record<string, string>
   notificationUrls: string[]
   maxRetries: number
   updatedAccountsPath: string
@@ -18,6 +19,7 @@ export interface RuntimeConfig {
 export function loadRuntimeConfig(env: Record<string, string | undefined>): RuntimeConfig {
   return {
     accountsSecret: optionalEnv(env, 'TAYGEDO_ACCOUNTS'),
+    accountPasswords: parseAccountPasswords(env),
     notificationUrls: [
       ...splitComma(env.TAYGEDO_NOTIFICATION_URLS),
       ...serverChanUrls(env.TAYGEDO_SERVERCHAN_SENDKEY),
@@ -32,6 +34,34 @@ export function loadRuntimeConfig(env: Record<string, string | undefined>): Runt
     upstashUrl: optionalEnv(env, 'TAYGEDO_UPSTASH_REDIS_REST_URL') ?? optionalEnv(env, 'UPSTASH_REDIS_REST_URL'),
     upstashToken: optionalEnv(env, 'TAYGEDO_UPSTASH_REDIS_REST_TOKEN') ?? optionalEnv(env, 'UPSTASH_REDIS_REST_TOKEN'),
   }
+}
+
+function parseAccountPasswords(env: Record<string, string | undefined>): Record<string, string> {
+  const passwords: Record<string, string> = {}
+  const rawMap = optionalEnv(env, 'TAYGEDO_PASSWORDS')
+  if (rawMap) {
+    const parsed = JSON.parse(rawMap) as unknown
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      throw new Error('TAYGEDO_PASSWORDS must be a JSON object')
+    }
+    for (const [key, value] of Object.entries(parsed)) {
+      if (typeof value !== 'string' || value.trim() === '') {
+        throw new Error('TAYGEDO_PASSWORDS values must be non-empty strings')
+      }
+      passwords[key] = value
+    }
+  }
+
+  const defaultPassword = optionalEnv(env, 'TAYGEDO_LOGIN_PASSWORD') ?? optionalEnv(env, 'TAYGEDO_PASSWORD')
+  if (defaultPassword) {
+    passwords.default = defaultPassword
+    const defaultAccountId = optionalEnv(env, 'TAYGEDO_LOGIN_ACCOUNT_ID') ?? optionalEnv(env, 'TAYGEDO_ACCOUNT_ID')
+    if (defaultAccountId) {
+      passwords[defaultAccountId] = defaultPassword
+    }
+  }
+
+  return passwords
 }
 
 export function splitComma(value: string | undefined): string[] {

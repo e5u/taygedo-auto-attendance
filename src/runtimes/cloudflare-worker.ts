@@ -1,7 +1,9 @@
 import { loadRuntimeConfig } from '../config/runtime.js'
 import { AttendanceService } from '../services/attendance-service.js'
+import { LoginService } from '../services/login-service.js'
 import { createAccountStore, createStateStore } from '../stores/factory.js'
 import { TaygedoApi } from '../taygedo/api.js'
+import type { LoginActionDependencies } from '../login-action.js'
 
 type ScheduledController = Record<string, unknown>
 type ExecutionContext = Record<string, unknown>
@@ -12,6 +14,7 @@ interface CloudflareEnv extends Record<string, unknown> {
     put(key: string, value: string): Promise<void>
   }
   TAYGEDO_TEST_API?: ConstructorParameters<typeof AttendanceService>[0]['api']
+  TAYGEDO_TEST_LOGIN_API?: LoginActionDependencies['api']
 }
 
 const worker = {
@@ -21,13 +24,18 @@ const worker = {
 
   async fetch(request: Request, env: CloudflareEnv, _ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url)
-    if (url.pathname !== '/run') {
+    if (url.pathname !== '/run' && url.pathname !== '/login') {
       return Response.json({ ok: true })
     }
 
     const config = loadRuntimeConfig(envToStrings(env))
     if (config.adminToken && request.headers.get('Authorization') !== `Bearer ${config.adminToken}`) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (url.pathname === '/login') {
+      const result = await runCloudflareLogin(request, env)
+      return Response.json({ ok: true, ...result })
     }
 
     const result = await runCloudflareAttendance(env)
@@ -43,10 +51,56 @@ async function runCloudflareAttendance(env: CloudflareEnv) {
     accountStore: createAccountStore({ config, kv: env.KV }),
     stateStore: createStateStore({ config, kv: env.KV }),
     api: env.TAYGEDO_TEST_API ?? new TaygedoApi(),
+    accountPasswords: config.accountPasswords,
     notificationUrls: config.notificationUrls,
     maxRetries: config.maxRetries,
   })
   return await service.run()
+}
+
+async function runCloudflareLogin(request: Request, env: CloudflareEnv) {
+  const config = loadRuntimeConfig(envToStrings(env))
+  const body = await readLoginBody(request)
+  const currentAccounts = await tryReadCloudflareAccounts(env, config.accountsKey, config.accountsSecret)
+  const service = new LoginService({ api: env.TAYGEDO_TEST_LOGIN_API ?? new TaygedoApi() })
+  await service.runLogin({
+    mode: body.mode ?? 'password',
+    phone: body.phone,
+    password: body.password,
+    captcha: body.captcha,
+    deviceId: body.deviceId,
+    accountId: body.accountId ?? 'main',
+    accountName: body.accountName ?? body.accountId ?? '主账号',
+    accountsFile: undefined,
+    accountsSecret: currentAccounts,
+    writeAccounts: payload => env.KV.put(config.accountsKey, payload),
+  })
+  return { accountId: body.accountId ?? 'main' }
+}
+
+interface LoginRequestBody {
+  mode?: string
+  phone: string
+  password?: string
+  captcha?: string
+  deviceId?: string
+  accountId?: string
+  accountName?: string
+}
+
+async function readLoginBody(request: Request): Promise<LoginRequestBody> {
+  if (request.method !== 'POST') {
+    throw new Error('Cloudflare login requires POST')
+  }
+  const body = await request.json() as Partial<LoginRequestBody>
+  if (!body.phone) {
+    throw new Error('Missing login phone')
+  }
+  return body as LoginRequestBody
+}
+
+async function tryReadCloudflareAccounts(env: CloudflareEnv, key: string, fallback?: string): Promise<string | undefined> {
+  return await env.KV.get(key) ?? fallback
 }
 
 function envToStrings(env: CloudflareEnv): Record<string, string | undefined> {

@@ -10,6 +10,7 @@ export interface LoginActionDependencies {
   api?: Pick<TaygedoApi, 'sendCaptcha' | 'checkCaptcha' | 'loginWithCaptcha' | 'userCenterLogin' | 'getBindRole'>
     & Partial<Pick<TaygedoApi, 'loginWithPassword'>>
   generateDeviceId?: () => string
+  writeAccounts?: (payload: string) => Promise<void>
 }
 
 export async function runLoginAction(deps: LoginActionDependencies = {}): Promise<void> {
@@ -70,8 +71,6 @@ export async function runLoginAction(deps: LoginActionDependencies = {}): Promis
   }
   if (mode === 'password') {
     nextAccount.phone = phone
-    nextAccount.password = password
-    nextAccount.passwordUpdatedAt = tokenUpdatedAt
   }
   if (role.roleId) {
     nextAccount.roleId = role.roleId
@@ -82,7 +81,13 @@ export async function runLoginAction(deps: LoginActionDependencies = {}): Promis
 
   const currentAccounts = env.TAYGEDO_ACCOUNTS ? parseAccountsSecret(env.TAYGEDO_ACCOUNTS) : []
   const updatedAccounts = upsertAccount(currentAccounts, nextAccount)
-  await writeTextFile(accountsPath, `${JSON.stringify(updatedAccounts, null, 2)}\n`)
+  const payload = JSON.stringify(updatedAccounts, null, 2)
+  if (deps.writeAccounts) {
+    await deps.writeAccounts(payload)
+  }
+  else {
+    await writeTextFile(accountsPath, `${payload}\n`)
+  }
   console.log(`账号已写入 ${accountsPath}`)
 }
 

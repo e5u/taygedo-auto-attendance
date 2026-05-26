@@ -16,8 +16,6 @@ describe('parseAccountsSecret', () => {
           laohuUserId: 'laohu-user',
           tokenUpdatedAt: '2026-05-07T00:00:00.000Z',
           phone: '13800138000',
-          password: 'secret-password',
-          passwordUpdatedAt: '2026-05-08T00:00:00.000Z',
           roleId: 'role-1',
           roleName: '角色一',
         },
@@ -36,8 +34,6 @@ describe('parseAccountsSecret', () => {
         laohuUserId: 'laohu-user',
         tokenUpdatedAt: '2026-05-07T00:00:00.000Z',
         phone: '13800138000',
-        password: 'secret-password',
-        passwordUpdatedAt: '2026-05-08T00:00:00.000Z',
         roleId: 'role-1',
         roleName: '角色一',
       },
@@ -99,20 +95,23 @@ describe('parseAccountsSecret', () => {
     ).toThrow('Optional field accessToken must be a non-empty string when provided')
   })
 
-  it('rejects empty optional password fields without exposing the password value', () => {
-    expect(() =>
-      parseAccountsSecret(
-        JSON.stringify([
-          {
-            id: 'main',
-            name: '主账号',
-            uid: '123456',
-            deviceId: 'device-a',
-            refreshToken: 'refresh-a',
-            password: '',
-          },
-        ]),
-      ),
-    ).toThrow('Optional field password must be a non-empty string when provided')
+  it('drops legacy plaintext password fields from parsed accounts', () => {
+    const accounts = parseAccountsSecret(
+      JSON.stringify([
+        {
+          id: 'main',
+          name: '主账号',
+          uid: '123456',
+          deviceId: 'device-a',
+          refreshToken: 'refresh-a',
+          password: 'secret-password',
+          passwordUpdatedAt: '2026-05-08T00:00:00.000Z',
+        },
+      ]),
+    )
+
+    expect(JSON.stringify(accounts)).not.toContain('secret-password')
+    expect(accounts[0]).not.toHaveProperty('password')
+    expect(accounts[0]).not.toHaveProperty('passwordUpdatedAt')
   })
 })

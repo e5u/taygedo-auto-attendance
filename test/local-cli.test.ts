@@ -45,4 +45,40 @@ describe('runLocalCli', () => {
       accountsFile: 'accounts.json',
     }))
   })
+
+  it('uses the login password from env when CLI password is omitted', async () => {
+    const originalPassword = process.env.TAYGEDO_LOGIN_PASSWORD
+    process.env.TAYGEDO_LOGIN_PASSWORD = 'env-password'
+    const service = {
+      runAttendance: vi.fn(),
+      runLogin: vi.fn().mockResolvedValue(undefined),
+      sendLoginCode: vi.fn(),
+    }
+
+    try {
+      await runLocalCli([
+        'login',
+        '--mode',
+        'password',
+        '--phone',
+        '13800138000',
+        '--account-id',
+        'main',
+        '--accounts-file',
+        'accounts.json',
+      ], { service })
+    }
+    finally {
+      if (originalPassword === undefined) {
+        delete process.env.TAYGEDO_LOGIN_PASSWORD
+      }
+      else {
+        process.env.TAYGEDO_LOGIN_PASSWORD = originalPassword
+      }
+    }
+
+    expect(service.runLogin).toHaveBeenCalledWith(expect.objectContaining({
+      password: 'env-password',
+    }))
+  })
 })

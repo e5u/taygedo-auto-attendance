@@ -11,6 +11,8 @@ export interface LoginServiceRunOptions {
   accountId?: string
   accountName?: string
   accountsFile?: string
+  accountsSecret?: string
+  writeAccounts?: (payload: string) => Promise<void>
 }
 
 export class LoginService {
@@ -21,7 +23,7 @@ export class LoginService {
   }
 
   async runLogin(options: LoginServiceRunOptions): Promise<void> {
-    const accountsSecret = options.accountsFile ? await tryReadFile(options.accountsFile) : undefined
+    const accountsSecret = options.accountsSecret ?? (options.accountsFile ? await tryReadFile(options.accountsFile) : undefined)
     await runLoginAction({
       ...this.deps,
       env: {
@@ -32,9 +34,10 @@ export class LoginService {
         TAYGEDO_LOGIN_DEVICE_ID: options.deviceId,
         TAYGEDO_LOGIN_ACCOUNT_ID: options.accountId,
         TAYGEDO_LOGIN_ACCOUNT_NAME: options.accountName,
-        TAYGEDO_LOGIN_UPDATED_ACCOUNTS_PATH: options.accountsFile,
+        TAYGEDO_LOGIN_UPDATED_ACCOUNTS_PATH: options.writeAccounts ? undefined : options.accountsFile,
         TAYGEDO_ACCOUNTS: accountsSecret,
       },
+      writeAccounts: options.writeAccounts,
     })
   }
 }
